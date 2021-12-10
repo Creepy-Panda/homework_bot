@@ -99,7 +99,7 @@ def main():
 
 
 def logger():
-    """Log setup"""
+    """Log setup."""
     logging.basicConfig(
         level=logging.DEBUG,
         filename='main.log',
