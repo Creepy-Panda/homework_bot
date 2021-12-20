@@ -37,24 +37,37 @@ def send_message(bot, message):
 def get_api_answer(current_timestamp):
     """Get json from api."""
     logging.debug('start get_api_answer')
+    bot = Bot(token=TELEGRAM_TOKEN)
     timestamp = current_timestamp or int(time.time())
     params = {'from_date': timestamp}
-    answer = requests.get(ENDPOINT, headers=HEADERS, params=params)
-    if answer.status_code == 500:
-        raise Exception('server 500')
-    if answer.status_code == 200:
-        homeworks = answer.json()
-    return homeworks
+    try:
+        answer = requests.get(ENDPOINT, headers=HEADERS, params=params)
+    except Exception as e:
+        logging.error('Error request')
+        error_message = f'error {e}'
+        send_message(bot, error_message)
+        raise Exception(error_message)
+    try:
+        if answer.status_code != 200:
+            raise Exception('server not response')
+    except Exception as e:
+        logging.error('Error status code')
+        error_message = f'error {e}'
+        send_message(bot, error_message)
+        raise Exception(error_message)
+    return answer.json()
 
 
 def check_response(response):
     """Check valid json response."""
     logging.debug('start check response')
-    homework = response['homeworks']
-    # не сооброзил как избавиться от ошибки в
-    # тесте test_parse_status_no_homework_name_key, очень надеюсь на подсказку
-    homework[0]
-    return homework
+    if isinstance(response, dict):
+        homeworks = response['homeworks']
+        if isinstance(homeworks[0], list):
+            raise TypeError('not Dict')
+        return homeworks
+    else:
+        raise TypeError('not Dict')
 
 
 def parse_status(homework):
@@ -70,7 +83,7 @@ def parse_status(homework):
 
 def check_tokens():
     """Check tokens if none flag false."""
-    if HEADERS is None or TELEGRAM_TOKEN is None or TELEGRAM_CHAT_ID is None:
+    if None in [HEADERS, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]:
         return False
     return True
 
@@ -86,15 +99,15 @@ def main():
             logging.debug('start while')
             homeworks = get_api_answer(current_timestamp)
             homework = check_response(homeworks)
-            if homework != []:
-                status_homework = parse_status(homework[0])
+            if homework:
+                status_homework = parse_status(homework)
                 send_message(bot, status_homework)
             time.sleep(RETRY_TIME)
 
         except Exception as error:
             logging.error('Error main')
             message = f'Сбой в работе программы: {error}'
-            print(message)
+            send_message(bot, message)
             time.sleep(RETRY_TIME)
 
 
