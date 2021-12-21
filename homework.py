@@ -52,7 +52,7 @@ def get_api_answer(current_timestamp):
         error_message = f'error {e}'
         main.old_message = error_message
         send_message(main.bot, error_message)
-        raise Exception(error_message)
+        raise GetAPIAnswerError(error_message)
     if answer.status_code != 200:
         raise Exception('server not response')
     try:
