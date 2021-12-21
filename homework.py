@@ -12,7 +12,7 @@ PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os .getenv('TELEGRAM_CHAT_ID')
 
-RETRY_TIME = 5
+RETRY_TIME = 600
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
 
@@ -22,6 +22,12 @@ HOMEWORK_STATUSES = {
     'reviewing': 'Работа взята на проверку ревьюером.',
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
+
+
+class GetAPIAnswerError(Exception):
+    """Custom error."""
+
+    pass
 
 
 def send_message(bot, message):
@@ -42,28 +48,29 @@ def get_api_answer(current_timestamp):
     params = {'from_date': timestamp}
     try:
         answer = requests.get(ENDPOINT, headers=HEADERS, params=params)
-    except Exception as e:
+    except requests.RequestException as e:
         logging.error('Error request')
         error_message = f'error {e}'
         send_message(bot, error_message)
         raise Exception(error_message)
+    if answer.status_code != 200:
+        raise Exception('server not response')
     try:
-        if answer.status_code != 200:
-            raise Exception('server not response')
-    except Exception as e:
-        logging.error('Error status code')
-        error_message = f'error {e}'
-        send_message(bot, error_message)
-        raise Exception(error_message)
-    return answer.json()
+        return answer.json()
+    except ValueError:
+        logging.error('Error json')
+        raise ValueError('json error')
 
 
 def check_response(response):
     """Check valid json response."""
     logging.debug('start check response')
     if isinstance(response, dict):
-        homeworks = response['homeworks']
-        if isinstance(homeworks[0], list):
+        if 'homeworks' in response and isinstance(response['homeworks'], list):
+            homeworks = response['homeworks']
+        else:
+            raise IndexError('Empty response')
+        if not isinstance(homeworks[0], dict):
             raise TypeError('not Dict')
         return homeworks
     else:
@@ -77,6 +84,8 @@ def parse_status(homework):
     homework_status = homework['status']
     if homework_status in HOMEWORK_STATUSES:
         verdict = HOMEWORK_STATUSES[homework_status]
+    else:
+        raise ValueError('error verdict')
 
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
@@ -94,6 +103,12 @@ def main():
     bot = Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
     check = check_tokens()
+    if check is False:
+        for i in [HEADERS, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]:
+            if i is None:
+                message = f'Empty token {i}'
+                logging.error(message)
+                print(message)
     while check:
         try:
             logging.debug('start while')
@@ -120,7 +135,7 @@ def logger():
     )
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
-    handler = logging.StreamHandler(stream=None)
+    handler = logging.StreamHandler
     logger.addHandler(handler)
 
 
