@@ -43,7 +43,6 @@ def send_message(bot, message):
 def get_api_answer(current_timestamp):
     """Get json from api."""
     logging.debug('start get_api_answer')
-    bot = Bot(token=TELEGRAM_TOKEN)
     timestamp = current_timestamp or int(time.time())
     params = {'from_date': timestamp}
     try:
@@ -51,7 +50,10 @@ def get_api_answer(current_timestamp):
     except requests.RequestException as e:
         logging.error('Error request')
         error_message = f'error {e}'
-        send_message(bot, error_message)
+        if e:
+            send_msg = send_message(main.bot, error_message)
+            send_message(main.bot, error_message)
+            return send_msg
         raise Exception(error_message)
     if answer.status_code != 200:
         raise Exception('server not response')
@@ -116,6 +118,9 @@ def main():
             homework = check_response(homeworks)
             if homework:
                 status_homework = parse_status(homework)
+                send_main_msg = send_message(bot, status_homework)
+                if get_api_answer.send_msg == send_main_msg:
+                    pass
                 send_message(bot, status_homework)
             time.sleep(RETRY_TIME)
 
