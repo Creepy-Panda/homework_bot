@@ -12,7 +12,7 @@ PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os .getenv('TELEGRAM_CHAT_ID')
 
-RETRY_TIME = 600
+RETRY_TIME = 2
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
 
@@ -50,10 +50,8 @@ def get_api_answer(current_timestamp):
     except requests.RequestException as e:
         logging.error('Error request')
         error_message = f'error {e}'
-        if e:
-            send_msg = send_message(main.bot, error_message)
-            send_message(main.bot, error_message)
-            return send_msg
+        main.old_message = error_message
+        send_message(main.bot, error_message)
         raise Exception(error_message)
     if answer.status_code != 200:
         raise Exception('server not response')
@@ -104,6 +102,7 @@ def main():
     logging.debug('start main')
     bot = Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
+    old_message = ''
     check = check_tokens()
     if check is False:
         for i in [HEADERS, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]:
@@ -118,15 +117,15 @@ def main():
             homework = check_response(homeworks)
             if homework:
                 status_homework = parse_status(homework)
-                send_main_msg = send_message(bot, status_homework)
-                if get_api_answer.send_msg == send_main_msg:
-                    pass
                 send_message(bot, status_homework)
             time.sleep(RETRY_TIME)
 
         except Exception as error:
             logging.error('Error main')
             message = f'Сбой в работе программы: {error}'
+            if old_message == message:
+                continue
+            old_message = message
             send_message(bot, message)
             time.sleep(RETRY_TIME)
 
