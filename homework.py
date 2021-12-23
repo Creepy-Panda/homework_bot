@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+from json.decoder import JSONDecodeError
 
 import requests
 from dotenv import load_dotenv
@@ -12,7 +13,7 @@ PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os .getenv('TELEGRAM_CHAT_ID')
 
-RETRY_TIME = 2
+RETRY_TIME = 600
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
 
@@ -30,14 +31,31 @@ class GetAPIAnswerError(Exception):
     pass
 
 
+class StatusCodeError(Exception):
+    """Custom statuscode error."""
+
+    pass
+
+
+class JsonError(Exception):
+    """Custom json unpack error."""
+
+    pass
+
+
+class SendMessageError(Exception):
+    """Send message custom error."""
+
+    pass
+
+
 def send_message(bot, message):
     """Send message to user in telegram."""
     try:
         logging.info('message send')
         return bot.send_message(TELEGRAM_CHAT_ID, message)
     except Exception:
-        logging.error('error with send message')
-        print(f'error from send message {Exception}')
+        raise SendMessageError('Send message error')
 
 
 def get_api_answer(current_timestamp):
@@ -48,33 +66,30 @@ def get_api_answer(current_timestamp):
     try:
         answer = requests.get(ENDPOINT, headers=HEADERS, params=params)
     except requests.RequestException as e:
-        logging.error('Error request')
         error_message = f'error {e}'
         main.old_message = error_message
         send_message(main.bot, error_message)
         raise GetAPIAnswerError(error_message)
     if answer.status_code != 200:
-        raise Exception('server not response')
+        raise StatusCodeError('server not response')
     try:
         return answer.json()
-    except ValueError:
-        logging.error('Error json')
-        raise ValueError('json error')
+    except JSONDecodeError:
+        raise JsonError('json error')
 
 
 def check_response(response):
     """Check valid json response."""
     logging.debug('start check response')
-    if isinstance(response, dict):
-        if 'homeworks' in response and isinstance(response['homeworks'], list):
-            homeworks = response['homeworks']
-        else:
-            raise IndexError('Empty response')
-        if not isinstance(homeworks[0], dict):
-            raise TypeError('not Dict')
-        return homeworks
+    if not isinstance(response, dict):
+        raise TypeError('response is have wrong type, correct dict')
+    if 'homeworks' in response and isinstance(response['homeworks'], list):
+        homeworks = response['homeworks']
     else:
-        raise TypeError('not Dict')
+        raise KeyError('Empty/wrong key in dict')
+    if not isinstance(homeworks[0], dict):
+        raise TypeError('arguments from key have wrong type')
+    return homeworks
 
 
 def parse_status(homework):
@@ -93,6 +108,12 @@ def parse_status(homework):
 def check_tokens():
     """Check tokens if none flag false."""
     if None in [HEADERS, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]:
+        if PRACTICUM_TOKEN is None:
+            logging.error('PRACTICUM_TOKEN is empty')
+        if TELEGRAM_TOKEN is None:
+            logging.error('TELEGRAM_TOKEN is empty')
+        if TELEGRAM_CHAT_ID is None:
+            logging.error('TELEGRAM_CHAT_ID is empty')
         return False
     return True
 
@@ -102,14 +123,8 @@ def main():
     logging.debug('start main')
     bot = Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
-    old_message = ''
+    old_message = None
     check = check_tokens()
-    if check is False:
-        for i in [HEADERS, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]:
-            if i is None:
-                message = f'Empty token {i}'
-                logging.error(message)
-                print(message)
     while check:
         try:
             logging.debug('start while')
@@ -117,6 +132,9 @@ def main():
             homework = check_response(homeworks)
             if homework:
                 status_homework = parse_status(homework)
+                if old_message == status_homework:
+                    continue
+                old_message = status_homework
                 send_message(bot, status_homework)
             time.sleep(RETRY_TIME)
 
