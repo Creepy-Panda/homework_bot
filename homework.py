@@ -5,7 +5,7 @@ from json.decoder import JSONDecodeError
 
 import requests
 from dotenv import load_dotenv
-from telegram import Bot
+from telegram import Bot, error
 
 load_dotenv()
 
@@ -54,7 +54,7 @@ def send_message(bot, message):
     try:
         logging.info('message send')
         return bot.send_message(TELEGRAM_CHAT_ID, message)
-    except Exception:
+    except error.TelegramError:
         raise SendMessageError('Send message error')
 
 
@@ -67,9 +67,7 @@ def get_api_answer(current_timestamp):
         answer = requests.get(ENDPOINT, headers=HEADERS, params=params)
     except requests.RequestException as e:
         error_message = f'error {e}'
-        main.old_message = error_message
-        send_message(main.bot, error_message)
-        raise GetAPIAnswerError(error_message)
+        raise GetAPIAnswerError(error_message) from e
     if answer.status_code != 200:
         raise StatusCodeError('server not response')
     try:
@@ -86,7 +84,7 @@ def check_response(response):
     if 'homeworks' in response and isinstance(response['homeworks'], list):
         homeworks = response['homeworks']
     else:
-        raise KeyError('Empty/wrong key in dict')
+        raise KeyError('Empty or wrong key in dict')
     if not isinstance(homeworks[0], dict):
         raise TypeError('arguments from key have wrong type')
     return homeworks
@@ -109,11 +107,11 @@ def check_tokens():
     """Check tokens if none flag false."""
     if None in [HEADERS, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]:
         if PRACTICUM_TOKEN is None:
-            logging.error('PRACTICUM_TOKEN is empty')
+            logging.critical('PRACTICUM_TOKEN is empty')
         if TELEGRAM_TOKEN is None:
-            logging.error('TELEGRAM_TOKEN is empty')
+            logging.critical('TELEGRAM_TOKEN is empty')
         if TELEGRAM_CHAT_ID is None:
-            logging.error('TELEGRAM_CHAT_ID is empty')
+            logging.critical('TELEGRAM_CHAT_ID is empty')
         return False
     return True
 
@@ -133,19 +131,20 @@ def main():
             if homework:
                 status_homework = parse_status(homework)
                 if old_message == status_homework:
+                    time.sleep(RETRY_TIME)
                     continue
                 old_message = status_homework
                 send_message(bot, status_homework)
-            time.sleep(RETRY_TIME)
 
         except Exception as error:
             logging.error('Error main')
             message = f'Сбой в работе программы: {error}'
             if old_message == message:
+                time.sleep(RETRY_TIME)
                 continue
             old_message = message
             send_message(bot, message)
-            time.sleep(RETRY_TIME)
+        time.sleep(RETRY_TIME)
 
 
 def logger():
