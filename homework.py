@@ -62,7 +62,7 @@ def get_api_answer(current_timestamp):
     """Get json from api."""
     logging.debug('start get_api_answer')
     timestamp = current_timestamp or int(time.time())
-    params = {'from_date': 1640356898}
+    params = {'from_date': timestamp}
     try:
         answer = requests.get(ENDPOINT, headers=HEADERS, params=params)
     except requests.RequestException as e:
