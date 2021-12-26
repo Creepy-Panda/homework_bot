@@ -62,7 +62,7 @@ def get_api_answer(current_timestamp):
     """Get json from api."""
     logging.debug('start get_api_answer')
     timestamp = current_timestamp or int(time.time())
-    params = {'from_date': timestamp}
+    params = {'from_date': 1640356898}
     try:
         answer = requests.get(ENDPOINT, headers=HEADERS, params=params)
     except requests.RequestException as e:
@@ -87,7 +87,7 @@ def check_response(response):
         raise KeyError('Empty or wrong key in dict')
     if not isinstance(homeworks[0], dict):
         raise TypeError('arguments from key have wrong type')
-    return homeworks
+    return homeworks[0]
 
 
 def parse_status(homework):
@@ -127,7 +127,9 @@ def main():
         try:
             logging.debug('start while')
             homeworks = get_api_answer(current_timestamp)
+            print(homeworks)
             homework = check_response(homeworks)
+            print(homework)
             if homework:
                 status_homework = parse_status(homework)
                 if old_message == status_homework:
