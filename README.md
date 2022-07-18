@@ -1,4 +1,4 @@
-#Bot-Assistent
+# Bot-Assistent
 
 ### Технологии:
 - Python
