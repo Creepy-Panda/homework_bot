@@ -2,7 +2,6 @@
 
 ### Технологии:
 - Python
-- python-dotenv
 - python-telegram-bot
 
 ## Описание проекта
