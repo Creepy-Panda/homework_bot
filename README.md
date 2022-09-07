@@ -1,7 +1,7 @@
 # Bot-Assistent
 
 ### Технологии:
-[!Python-telegram-bot](https://img.shields.io/badge/python-python--telegram--bot-red?style=for-the-badge&logo=appveyor)
+![Python-telegram-bot](https://img.shields.io/badge/python-python--telegram--bot-red?style=for-the-badge&logo=appveyor)
 
 ## Описание проекта
 
